@@ -19,6 +19,7 @@ except ImportError:
 #request 설치
 
 
+
 pygame.init()  # pygame 초기화
 pygame.mixer.init()
 screen = pygame.display.set_mode((1200, 700))  # 창 크기 설정
@@ -63,6 +64,8 @@ last_time = 0#전 타자시간,전시간
 tugging=False#힘쌘학생전용
 tugpoint=0
 curtugstudent=-1
+musicing=0
+musictile=[]
 istalking=True#대화중인지
 storynum = 0 #스토리넘버
 
@@ -79,14 +82,79 @@ wholestream=0#0>튜토리얼 1>메인화면 2>설명 3>로비 4>호실안 5>결�
 explainpage=0#로비페이지
 studentsexplain = ["그저 비어있음","자고 있는 학생(잡으면 -2)","이불속에서 자고 있는 학생(잡으면 -2)","사감쌤이 왔는데도 당당히 폰하는 학생(클릭해 잡기)",
                    "숨기는 학생(시간이 지나면 자는 학생처럼 겉모습이 바뀜,기억했다가 잡기)","이불속에서 하는 학생(그냥잡기)","도망치는 학생(시간이 지나면 화면 왼쪽으로 도망감,도망가는 것을 클릭해 잡기)","힘쌘 학생(누르고 광클해서 잡기 게이지가 없어지면 놓침)"]
+
 sounds = ["death.wav","brah.wav","pew.mp3","byam.mp3","afew.mp3"]
 score=0
-def setimage(a):
-    url="https://github.com/minjuneck/python-programming---game-simulator/blob/main/game/"+a
-    img_bytes = requests.get(url).content
-    img = pygame.image.load(BytesIO(img_bytes))
-    return img
+#####################################################
+CACHE_DIR = "cache"
+BASE_URL = "https://raw.githubusercontent.com/minjuneck/python-programming---game-simulator/main/game/"
+if not os.path.exists(CACHE_DIR):
+    os.makedirs(CACHE_DIR)
+def download_and_cache(filename):
+    local_path = os.path.join(CACHE_DIR, filename)
+    url = BASE_URL + filename
+
+    # 이미 캐시에 있으면 다운로드 생략
+    if os.path.exists(local_path):
+        return local_path
+
+    print(f"[DOWNLOAD] {filename} 다운로드 중...")
+
+    data = requests.get(url).content
+
+    with open(local_path, "wb") as f:
+        f.write(data)
+
+    return local_path
+PRELOAD_IMAGES = [
+    "afew.png",
+    "background1.png",
+    "background2.png",
+    "background3.png",
+    "background4.png",
+    "bed.png",
+    "openeddoor.png",
+    "out.png",
+    "pannel.png",
+    "student1.png",
+    "student2.png",
+    "student3.png",
+    "student4.png",
+    "student5.png",
+    "student5-1.png",
+    "student6.png",
+]
+PRELOAD_SOUNDS = [
+    "afew.mp3",
+    "brah.wav",
+    "byam.mp3",
+    "death.wav",
+    "pew.mp3",
+    "pop.mp3",
+]
+
+def preload_all_images():
+    print("=== 이미지 Preload 시작 ===")
+    for img in PRELOAD_IMAGES:
+        download_and_cache(img)
+    print("=== Preload 완료 ===")
+
+def preload_all_sounds():
+    print("=== 사운드 Preload 시작 ===")
+    for snd in PRELOAD_SOUNDS:
+        download_and_cache(snd)
+    print("=== 사운드 Preload 완료 ===")
+
+def setimage(filename):
+    path = download_and_cache(filename)  # 캐시된 파일 경로 가져오기
+    return pygame.image.load(path)
+
+def loadsound(filename):
+    path = download_and_cache(filename)
+    return pygame.mixer.Sound(path)
+###################################################
 #함수존
+
 def set_studentimg(num,x,y):
     img = setimage(studentimg[num])
     if(num!=0 and num!=12):#111111111111111111111111111111111
@@ -98,21 +166,25 @@ def get_score(whereclick):
     global curtugstudent
     global tugpoint
     global wholestream
+    global musicing
+    global musictile
     if students[curdoor][whereclick]>2:
         if students[curdoor][whereclick]!=12 and students[curdoor][whereclick]!=7 and students[curdoor][whereclick]!=8 and students[curdoor][whereclick]!=9:#111111111111111111111
             score+=1
             students[curdoor][whereclick]=0
-            pygame.mixer.Sound(sounds[random.randint(0, 3)]).play()
+            loadsound(sounds[random.randint(0, 3)]).play()
         elif(students[curdoor][whereclick]==7):
             tugging=True
             tugpoint =10
             curtugstudent=whereclick
-        elif(students[curdoor][whereclick]==8 or students[curdoor][whereclick]==9):
-            wholestream = 6
+        elif(students[curdoor][whereclick]==8):
+            musicing=1
+            musictile = [random.randint(0,1) for _ in range(6)]
+            print(musictile)
     elif students[curdoor][whereclick]<=2 and students[curdoor][whereclick]>0:
         score-=2
         students[curdoor][whereclick]=0
-        pygame.mixer.Sound(sounds[random.randint(0, 3)]).play()
+        loadsound(sounds[random.randint(0, 3)]).play()
 
 def opendoor(num):
         global doors
@@ -125,9 +197,9 @@ def opendoor(num):
             curdoor=num
             last_time =pygame.time.get_ticks()
 
+preload_all_images()
+preload_all_sounds()
 while running:#무한함수 > 실행중
-    pygame.mixer.music.load("brah.wav")
-    pygame.mixer.music.play()#bgm
     font = pygame.font.Font("C:/Windows/Fonts/malgun.ttf", 30)#기본폰트
     if data.get('튜토리얼')==1 and wholestream==0:
         wholestream=1
@@ -186,7 +258,7 @@ while running:#무한함수 > 실행중
                         text_index=0
                         if(textnum==4):
                             storynum+=1
-                            pygame.mixer.Sound(sounds[4]).play()
+                            loadsound(sounds[4]).play()
                         if(textnum==6):
                             storynum+=1
                         if(textnum==7):
@@ -200,13 +272,8 @@ while running:#무한함수 > 실행중
                         while 1:
                             j,k=random.randint(0, 9),random.randint(0, 5)
                             if students[j][k] <= 2:
-                                students[j][k] = random.randint(3, 7)
+                                students[j][k] = random.randint(3, 8)
                                 break
-                    while 1:
-                        j,k=random.randint(0, 9),random.randint(0, 5)
-                        if students[j][k] <= 2:
-                            students[j][k] = random.randint(8, 9)
-                            break
 
                     print(students)
                 if x>1050 and x<1200 and y<200:
@@ -250,7 +317,7 @@ while running:#무한함수 > 실행중
                             if x> a and x<a+200 and y>550:
                                 score+=1
                                 students[curdoor][i]=0
-                                pygame.mixer.Sound(sounds[random.randint(0, 3)]).play()
+                                loadsound(sounds[random.randint(0, 3)]).play()
                 if x<350 and y<300:#1
                     get_score(0)
                 elif x<350 and y>300 and y<550:#2
@@ -322,7 +389,7 @@ while running:#무한함수 > 실행중
                 curscript += scripts[textnum][text_index]
                 text_index += 1
                 last_time = now
-                pygame.mixer.Sound("pop.mp3").play()
+                loadsound("pop.mp3").play()
 
             text = font.render(curscript, True, (0, 0, 0))  # 글자 렌더링
             screen.blit(text, (140, 600))  # 출력
@@ -405,15 +472,10 @@ while running:#무한함수 > 실행중
                 curscript += endscripts[textnum][text_index]
                 text_index += 1
                 last_time = now
-                pygame.mixer.Sound("pop.mp3").play()
+                loadsound("pop.mp3").play()
 
             text = font.render(curscript, True, (0, 0, 0))  # 글자 렌더링
             screen.blit(text, (140, 600))  # 출력
-    elif wholestream==6:
-        img = setimage("background1.png")  # 이미지 불러오기
-        screen.blit(img, (0, 0))
-        text = font.render("여긴 히든 룸ㅁㅁㅁㅁ", True, (0, 0, 0))  # 글자 렌더링
-        screen.blit(text, (1100, 0))  # 출력
     if(tugging):
         pygame.draw.rect(screen, (0,0,0), (100, 50,1000,150))
         pygame.draw.rect(screen, (0,0,255), (100, 50,10*tugpoint,150))
@@ -425,10 +487,12 @@ while running:#무한함수 > 실행중
             score+=1
             students[curdoor][curtugstudent]=0
             curtugstudent=-1
-            pygame.mixer.Sound(sounds[random.randint(0, 3)]).play()
+            loadsound(sounds[random.randint(0, 3)]).play()
         elif(tugpoint<0):
             tugging=0
             students[curdoor][curtugstudent]=0
+    if(musicing):
+
     pygame.display.flip()  # 화면 업데이트
 
     #FPS 제한
